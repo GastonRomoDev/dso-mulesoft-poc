@@ -11,10 +11,19 @@ pool:
   demands: maven
 
 parameters:
-  MAVEN_CACHE_FOLDER: '$(HOME)/.m2/repository'
-  MAVEN_CLEAN: true
-  TEST_TIMEOUT_MINUTES: 5
-  VERSION: '1.0.0-SNAPSHOT'
+  - name: MAVEN_CACHE_FOLDER
+    type: string
+    default: '$(HOME)/.m2/repository'
+  - name: MAVEN_CLEAN
+    type: boolean
+    default: true
+  - name: TEST_TIMEOUT_MINUTES
+    type: number
+    default: 5
+  - name: POM_VERSION
+    type: string
+    default: '1.0.0-SNAPSHOT'
+  
 
 variables:
   - group: anypoint-platform-dev-variables
@@ -38,17 +47,26 @@ jobs:
     - task: Maven@4
       displayName: 'Package'
       inputs:
-        goals: '$(if eq(parameters.MAVEN_CLEAN, true), 'clean ', '')package'
+        script: |
+          if [ "$(MAVEN_CLEAN)" = "true" ]; then
+            mvn clean package
+          else
+            mvn package
+          fi
         mavenPomFile: 'pom.xml'
         options: '-s $(Agent.TempDirectory)/settings.xml'
 
     - task: Maven@4
       displayName: 'MUnit Test'
       inputs:
-        goals: '$(if eq(parameters.MAVEN_CLEAN, true), 'clean ', '')test'
+        script: |
+          if [ "$(MAVEN_CLEAN)" = "true" ]; then
+            mvn clean test
+          else
+            mvn test
+          fi
         mavenPomFile: 'pom.xml'
         options: '-s $(Agent.TempDirectory)/settings.xml'
-      timeoutInMinutes: $(TEST_TIMEOUT)
 
 - job: deployJob
   displayName: 'Deploy'
