@@ -1,0 +1,94 @@
+trigger: none
+ 
+pr:
+  branches:
+    include:
+    - develop
+
+pool:
+  vmImage: ubuntu-latest
+  name: Azure Pipelines
+  demands: maven
+
+variables:
+  - name: MAVEN_CACHE_FOLDER
+    value: '$(HOME)/.m2/repository'
+  - name: MAVEN_OPTS
+    value: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+  - group: anypoint-platform-dev-variables
+  - group: anypoint-platform-variables
+
+jobs:
+- job: packageAndTestJob
+  displayName: 'Package and Test'
+  steps:
+    - task: Cache@2
+      displayName: 'Cache Maven local repo'
+      inputs:
+        key: '"funcs" | maven | "$(Agent.OS)" | pom.xml'
+        path: $(MAVEN_CACHE_FOLDER)
+
+    - task: DownloadSecureFile@1
+      displayName: 'Download Settings'
+      inputs:
+        secureFile: 'settings.xml'
+  
+    - task: Bash@3
+      displayName: 'Update pom.xml version for package'
+      inputs:
+        filePath: 'update-pom-version.sh'
+      env:
+        CURRENT_BRANCH: '$(Build.SourceBranchName)'
+        CURRENT_JOB: '$(Agent.JobName)'
+
+    - task: Maven@4
+      displayName: 'Package'
+      inputs:
+        goals: 'clean package'
+        mavenPomFile: 'pom.xml'
+        options: '-s $(Agent.TempDirectory)/settings.xml'
+
+    - task: Maven@4
+      displayName: 'MUnit Test'
+      inputs:
+        goals: 'clean test'
+        mavenPomFile: 'pom.xml'
+        options: '-s $(Agent.TempDirectory)/settings.xml'
+
+- job: deployJob
+  displayName: 'Deploy'
+  dependsOn: packageAndTestJob
+  steps:
+    - task: DownloadSecureFile@1
+      displayName: 'Download Settings'
+      inputs:
+        secureFile: 'settings.xml'
+  
+    - task: Bash@3
+      displayName: 'Update pom.xml version for deploy'
+      inputs:
+        filePath: 'update-pom-version.sh'
+      env:
+        CURRENT_BRANCH: '$(Build.SourceBranchName)'
+        CURRENT_JOB: '$(Agent.JobName)'
+
+    - task: Maven@4
+      displayName: "Deploy: Exchange"
+      inputs:
+        goals: 'deploy'
+        mavenPomFile: 'pom.xml'
+        options: "--settings $(Agent.TempDirectory)/settings.xml \
+                  -DskipTests=true \
+                  -Dconn.app.client.id=$(conn.app.client.id) \
+                  -Dconn.app.client.secret=$(conn.app.client.secret)"
+
+    - task: Maven@4
+      displayName: "Deploy: Cloudhub"
+      inputs:
+        goals: 'deploy'
+        mavenPomFile: 'pom.xml'
+        options: "--settings $(Agent.TempDirectory)/settings.xml \
+                  -DmuleDeploy \
+                  -Denvironment=$(environment) \
+                  -Dconn.app.client.id=$(conn.app.client.id) \
+                  -Dconn.app.client.secret=$(conn.app.client.secret)"
