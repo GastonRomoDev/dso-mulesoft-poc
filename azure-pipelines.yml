@@ -10,11 +10,13 @@ pool:
   name: Azure Pipelines
   demands: maven
 
+parameters:
+  MAVEN_CACHE_FOLDER: '$(HOME)/.m2/repository'
+  MAVEN_CLEAN: true
+  TEST_TIMEOUT_MINUTES: 5
+  VERSION: '1.0.0-SNAPSHOT'
+
 variables:
-  - name: MAVEN_CACHE_FOLDER
-    value: '$(HOME)/.m2/repository'
-  - name: MAVEN_OPTS
-    value: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
   - group: anypoint-platform-dev-variables
   - group: anypoint-platform-variables
 
@@ -32,28 +34,21 @@ jobs:
       displayName: 'Download Settings'
       inputs:
         secureFile: 'settings.xml'
-  
-    - task: Bash@3
-      displayName: 'Update pom.xml version for package'
-      inputs:
-        filePath: 'update-pom-version.sh'
-      env:
-        CURRENT_BRANCH: '$(Build.SourceBranchName)'
-        CURRENT_JOB: '$(Agent.JobName)'
 
     - task: Maven@4
       displayName: 'Package'
       inputs:
-        goals: 'clean package'
+        goals: '$(if eq(parameters.MAVEN_CLEAN, true), 'clean ', '')package'
         mavenPomFile: 'pom.xml'
         options: '-s $(Agent.TempDirectory)/settings.xml'
 
     - task: Maven@4
       displayName: 'MUnit Test'
       inputs:
-        goals: 'clean test'
+        goals: '$(if eq(parameters.MAVEN_CLEAN, true), 'clean ', '')test'
         mavenPomFile: 'pom.xml'
         options: '-s $(Agent.TempDirectory)/settings.xml'
+      timeoutInMinutes: $(TEST_TIMEOUT)
 
 - job: deployJob
   displayName: 'Deploy'
@@ -69,8 +64,8 @@ jobs:
       inputs:
         filePath: 'update-pom-version.sh'
       env:
+        VERSION: '$(VERSION)'
         CURRENT_BRANCH: '$(Build.SourceBranchName)'
-        CURRENT_JOB: '$(Agent.JobName)'
 
     - task: Maven@4
       displayName: "Deploy: Exchange"
