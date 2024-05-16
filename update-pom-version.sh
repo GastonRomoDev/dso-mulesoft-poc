@@ -12,10 +12,11 @@ if [[ "$DEPLOY_CLOUDHUB" ]]; then
   NEW_VERSION="$NEW_VERSION-$(date +%s)"
   # Update the version in the pom.xml file
   sed -i "s|<version>$CURRENT_VERSION|<version>$NEW_VERSION|g" "$POM_FILE"
+  echo "New version for deployment: $NEW_VERSION"
 else
   # Update the version in the pom.xml file
   sed -i "s|<version>$CURRENT_VERSION|<version>$NEW_VERSION|g" "$POM_FILE"
   # Print the new version
-  echo "Version updated: $NEW_VERSION"
-  # Add, commit and push to repo
+  echo "New version: $NEW_VERSION"
+  # Add, commit, and push to the repo (Add your implementation here)
 fi
