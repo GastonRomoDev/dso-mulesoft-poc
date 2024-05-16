@@ -20,7 +20,7 @@ parameters:
   - name: TEST_TIMEOUT_MINUTES
     type: number
     default: 5
-  - name: POM_VERSION
+  - name: NEW_VERSION
     type: string
     default: '1.0.0-SNAPSHOT'
   
@@ -78,13 +78,33 @@ jobs:
         secureFile: 'settings.xml'
   
     - task: Bash@3
-      displayName: 'Update pom.xml version for deploy'
+      displayName: 'Update pom.xml version - NEXUS'
       inputs:
         filePath: 'update-pom-version.sh'
       env:
-        VERSION: '$(VERSION)'
-        CURRENT_BRANCH: '$(Build.SourceBranchName)'
-
+        NEW_VERSION: '$(NEW_VERSION)'
+        DEPLOY_CLOUDHUB: false
+        
+    - task: Maven@4
+      displayName: 'Package'
+      inputs:
+        script: |
+          if [ "$(MAVEN_CLEAN)" = "true" ]; then
+            mvn clean package
+          else
+            mvn package
+          fi
+        mavenPomFile: 'pom.xml'
+        options: '-s $(Agent.TempDirectory)/settings.xml'
+        
+    - task: Bash@3
+      displayName: 'Update pom.xml version - DEPLOY'
+      inputs:
+        filePath: 'update-pom-version.sh'
+      env:
+        NEW_VERSION: '$(NEW_VERSION)'
+        DEPLOY_CLOUDHUB: true
+        
     - task: Maven@4
       displayName: "Deploy: Exchange"
       inputs:
